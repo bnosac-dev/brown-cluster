@@ -1117,7 +1117,7 @@ void do_clustering() {
   delete [] threads;
 
   logs("Done: 1 cluster left: mutual info = " << curr_minfo);
-  //mem_tracker.report_mem_usage();
+  mem_tracker.report_mem_usage();
   //assert(feq(curr_minfo, 0.0));
 }
 
