@@ -1,4 +1,5 @@
 Implementation of the Brown hierarchical word clustering algorithm.
+[port to windows by chris quirk chris@quirk.net]
 Percy Liang
 Release 1.3
 2012.07.24
