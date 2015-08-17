@@ -36,10 +36,20 @@ Ideas:
 #include "basic/union-set.h"
 #include "basic/mem-tracker.h"
 #include "basic/opt.h"
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+
+#ifdef _WIN32
+#include <windows.h>
+int getpid()
+{
+  return GetCurrentProcessId();
+}
+#endif
 
 vector< OptInfo<bool> > bool_opts;
 vector< OptInfo<int> > int_opts;

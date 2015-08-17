@@ -1,6 +1,10 @@
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <dirent.h>
 #include <unistd.h>
+#else
+#include <windows.h>
+#endif
 #include "std.h"
 #include "str.h"
 #include "timer.h"
@@ -37,7 +41,11 @@ int mem_usage() {
 
 // Return whether the file exists.
 bool file_exists(const char *file) {
+#ifndef _WIN32
   return access(file, F_OK) == 0;
+#else
+  return INVALID_FILE_ATTRIBUTES != ::GetFileAttributes(file);
+#endif
 }
 
 // Create an empty file.  Return success.
@@ -94,6 +102,7 @@ string file_base(string s) {
 }
 
 bool get_files_in_dir(string dirname, bool fullpath, vector<string> &files) {
+#ifndef _WIN32
   DIR *dir = opendir(dirname.c_str());
   if(!dir) return false;
   while(true) {
@@ -108,4 +117,20 @@ bool get_files_in_dir(string dirname, bool fullpath, vector<string> &files) {
   }
   closedir(dir);
   return true;
+#else
+  WIN32_FIND_DATA data;
+  HANDLE hfind;
+
+  string search = dirname;
+  search += "\\*";
+  hfind = FindFirstFile(search.c_str(), &data);
+  if (hfind == INVALID_HANDLE_VALUE) return false;
+  do {
+    if (0 == (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+      files.push_back((fullpath ? dirname + "\\" : string()) + data.cFileName);
+    }
+  } while (FindNextFile(hfind, &data));
+  FindClose(hfind);
+  return true;
+#endif
 }

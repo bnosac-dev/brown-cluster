@@ -37,13 +37,16 @@ double binomial_prob(int n, int k, double p) {
 }
 
 int rand_index(const fvector &probs) {
-  double v = rand_double();
-  double sum = 0;
-  foridx(i, len(probs)) {
-    sum += probs[i];
-    if(v < sum) return i;
+  while (1)
+  {
+    double v = rand_double();
+    double sum = 0;
+    foridx(i, len(probs)) {
+      sum += probs[i];
+      if(v < sum) return i;
+    }
+    assert(0);
   }
-  assert(0);
 }
 
 void norm_distrib(fvector &vec) {

@@ -10,7 +10,11 @@
 // Alway underestimates.
 
 // Call this function.  Don't use anything else.
+#ifndef _WIN32
 #define track_mem(x) mem_tracker.add(__STRING(x), x)
+#else
+#define track_mem(x) mem_tracker.add((#x), x)
+#endif
 
 #define list_types(f) \
   f(IntVec) \
@@ -28,7 +32,11 @@
   f(StrDB)
 
 #define prefix_t(type) T_##type,
+#ifndef _WIN32
 #define define_str(type) __STRING(type),
+#else
+#define define_str(type) (#type),
+#endif
 #define define_add(type) \
   void add(const char *name, const type &data) { \
     records.push_back(MemRecord(name, T_##type, &data)); \

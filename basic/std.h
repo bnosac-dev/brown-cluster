@@ -75,6 +75,7 @@ inline void _assert_feq(double u, double v, double tol, const char *file, int li
 inline void _assert_fneq(double u, double v, const char *file, int line) {
   if(feq(u, v)) { printf("At %s:%d, %f == %f\n", file, line, u, v); assert(0); }
 }
+#ifndef _WIN32
 #define assert_eq(u, v) do { _assert_eq(u, v, __STRING(u), __STRING(v), __FILE__, __LINE__); } while(0)
 template<class T> inline void _assert_eq(const T &u, const T &v, const char *us, const char *vs, const char *file, int line) {
   if(u != v) {
@@ -84,6 +85,17 @@ template<class T> inline void _assert_eq(const T &u, const T &v, const char *us,
     assert(0);
   }
 }
+#else
+#define assert_eq(u, v) do { _assert_eq(u, v, (#u), (#v), __FILE__, __LINE__); } while(0)
+template<class T> inline void _assert_eq(const T &u, const T &v, const char *us, const char *vs, const char *file, int line) {
+  if(u != v) {
+    cout << "At " << file << ':' << line << ", " <<
+            us << '(' << u << ')' << " != " <<
+            vs << '(' << v << ')' << endl;
+    assert(0);
+  }
+}
+#endif
 
 #define assert2(x, reason) \
   do { \

@@ -49,5 +49,5 @@ MemTracker mem_tracker;
 
 const char *MemTracker::type_names[] = {
   "?",
-  list_types(define_str)
+  //list_types(define_str)
 };
