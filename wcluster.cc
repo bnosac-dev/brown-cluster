@@ -51,6 +51,31 @@ int getpid()
 }
 #endif
 
+class semaphore
+{
+private:
+	mutex _m;
+	condition_variable _cv;
+	int _count;
+
+public:
+	semaphore(int count = 0) : _count(count) {}
+
+	inline void notify()
+	{
+		unique_lock<mutex> lock(_m);
+		++_count;
+		_cv.notify_one();
+	}
+
+	inline void wait()
+	{
+		unique_lock<mutex> lock(_m);
+		_cv.wait(lock, [this]() { return _count > 0; });
+		--_count;
+	}
+};
+
 vector< OptInfo<bool> > bool_opts;
 vector< OptInfo<int> > int_opts;
 vector< OptInfo<double> > double_opts;
@@ -125,8 +150,8 @@ double curr_minfo; // Mutual info, should be sum of all q2's
 DoubleVec kl_map[2];
 
 // Variables used to control the thread pool
-mutex * thread_idle;
-mutex * thread_start;
+vector<semaphore> thread_idle;
+vector<semaphore> thread_start;
 thread * threads;
 struct Compute_L2_Job {
   int s;
@@ -687,11 +712,11 @@ void incorporate_new_phrase(int a) {
     the_job.is_type_a = true;
     // start the jobs
     for (int ii=0; ii<num_threads; ii++) {
-      thread_start[ii].unlock(); // the thread waits for this lock to begin
+      thread_start[ii].notify(); // the thread waits for this lock to begin
     }
     // wait for them to be done
     for (int ii=0; ii<num_threads; ii++) {
-      thread_idle[ii].lock();  // the thread releases the lock to finish
+      thread_idle[ii].wait();  // the thread releases the lock to finish
     }
   }
 
@@ -704,54 +729,58 @@ void update_L2(int thread_id) {
   while (true) {
 
     // wait for mutex to unlock to begin the job
-    thread_start[thread_id].lock();
+    thread_start[thread_id].wait();
     if ( all_done ) break;  // mechanism to close the threads
+	if (false)
+	{
 
-    int num_clusters = len(slot2cluster);
+		int num_clusters = len(slot2cluster);
 
-    if (the_job.is_type_a) {
-      int s = the_job.s;
+		if (the_job.is_type_a) {
+			int s = the_job.s;
 
-      for(int t=thread_id; t < num_clusters; t += num_threads) { // L2[s, *], L2[*, s]
-        if (slot2cluster[t] == -1) continue;
-        if (s == t) continue;
-        int S, T;
-        if(ORDER_VALID(s, t)) S = s, T = t;
-        else                  S = t, T = s;
-        L2[S][T] = compute_L2(S, T);
-      }
+			for (int t = thread_id; t < num_clusters; t += num_threads) { // L2[s, *], L2[*, s]
+				if (slot2cluster[t] == -1) continue;
+				if (s == t) continue;
+				int S, T;
+				if (ORDER_VALID(s, t)) S = s, T = t;
+				else                  S = t, T = s;
+				L2[S][T] = compute_L2(S, T);
+			}
 
-      for(int t=thread_id; t < num_clusters; t += num_threads) {
-        if (slot2cluster[t] == -1) continue;
-        if (t == s) continue;
-        FOR_SLOT(u) {
-          if(u == s) continue;
-          if(!ORDER_VALID(t, u)) continue;
-          L2[t][u] += bi_q2(t, s) + bi_q2(u, s) - bi_hyp_q2(_(t, u), s);
-        }
-      }
+			for (int t = thread_id; t < num_clusters; t += num_threads) {
+				if (slot2cluster[t] == -1) continue;
+				if (t == s) continue;
+				FOR_SLOT(u) {
+					if (u == s) continue;
+					if (!ORDER_VALID(t, u)) continue;
+					L2[t][u] += bi_q2(t, s) + bi_q2(u, s) - bi_hyp_q2(_(t, u), s);
+				}
+			}
 
-    } else {       // this is a type B job
-      int s = the_job.s;
-      int t = the_job.t;
-      int u = the_job.u;
+		}
+		else {       // this is a type B job
+			int s = the_job.s;
+			int t = the_job.t;
+			int u = the_job.u;
 
-      for (int v = thread_id; v < num_clusters; v += num_threads) {
-        if ( slot2cluster[v] == -1) continue;
-        for ( int w = 0; w < num_clusters; w++) {
-          if ( slot2cluster[w] == -1) continue;
-          if(!ORDER_VALID(v, w)) continue;
+			for (int v = thread_id; v < num_clusters; v += num_threads) {
+				if (slot2cluster[v] == -1) continue;
+				for (int w = 0; w < num_clusters; w++) {
+					if (slot2cluster[w] == -1) continue;
+					if (!ORDER_VALID(v, w)) continue;
 
-          if(v == u || w == u)
-            L2[v][w] = compute_L2(v, w);
-          else
-            L2[v][w] = compute_L2_using_old(s, t, u, v, w);
-        }
-      }
-    }
+					if (v == u || w == u)
+						L2[v][w] = compute_L2(v, w);
+					else
+						L2[v][w] = compute_L2_using_old(s, t, u, v, w);
+				}
+			}
+		}
+	}
 
     // signal that the thread is done by unlocking the mutex
-    thread_idle[thread_id].unlock();
+    thread_idle[thread_id].notify();
   }
 }
 
@@ -813,11 +842,11 @@ void merge_clusters(int s, int t) {
 
     // start the jobs
     for (int ii=0; ii<num_threads; ii++) {
-      thread_start[ii].unlock(); // the thread waits for this lock to begin
+      thread_start[ii].notify(); // the thread waits for this lock to begin
     }
     // wait for them to be done
     for (int ii=0; ii<num_threads; ii++) {
-      thread_idle[ii].lock();  // the thread releases the lock to finish
+      thread_idle[ii].wait();  // the thread releases the lock to finish
     }
   }
 }
@@ -1034,12 +1063,12 @@ void do_clustering() {
   repcheck();
 
   // start the threads
-  thread_start = new mutex[num_threads];
-  thread_idle = new mutex[num_threads];
+  { vector<semaphore> i(num_threads); thread_start.swap(i); }
+  { vector<semaphore> i(num_threads); thread_idle.swap(i); }
   threads = new thread[num_threads];
   for (int ii=0; ii<num_threads; ii++) {
-    thread_start[ii].lock();
-    thread_idle[ii].lock();
+    thread_start[ii].notify();
+    thread_idle[ii].notify();
     threads[ii] = thread(update_L2, ii);
   }
 
@@ -1080,15 +1109,15 @@ void do_clustering() {
   // finish the threads
   all_done = true;
   for (int ii=0; ii<num_threads; ii++) {
-    thread_start[ii].unlock(); // thread will grab this to start
+    thread_start[ii].notify(); // thread will grab this to start
     threads[ii].join();
   }
-  delete [] thread_start;
-  delete [] thread_idle;
+  { vector<semaphore> i; thread_start.swap(i); }
+  { vector<semaphore> i; thread_idle.swap(i); }
   delete [] threads;
 
   logs("Done: 1 cluster left: mutual info = " << curr_minfo);
-  mem_tracker.report_mem_usage();
+  //mem_tracker.report_mem_usage();
   //assert(feq(curr_minfo, 0.0));
 }
 
