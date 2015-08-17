@@ -1167,10 +1167,26 @@ int main(int argc, char *argv[]) {
     output_dir += ".out";
   }
 
+#ifndef _WIN32
   if(system(("mkdir -p " + output_dir).c_str()) != 0)
     assert2(false, "Can't create " << output_dir);
   if(system(("rm -f " + output_dir + "/*").c_str()) != 0)
     assert2(false, "Can't remove things in " << output_dir);
+#else
+  if (!::CreateDirectory(output_dir.c_str(), NULL) && ERROR_ALREADY_EXISTS != ::GetLastError())
+    assert2(false, "Can't create " << output_dir);
+  {
+    vector<string> files;
+    bool success = true;
+    if (!(success = get_files_in_dir(output_dir.c_str(), true, files))) {
+      for (auto s : files) {
+        if (!::DeleteFile(s.c_str())) success = false;
+      }
+    }
+    if (!success)
+      assert2(false, "Can't remove things in " << output_dir);
+  }
+#endif
 
   // Set arguments from the output_dir.
   if(!output_dir.empty()) {
