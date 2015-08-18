@@ -1,5 +1,9 @@
 #include "prob-utils.h"
 
+#ifndef M_PI
+# define M_PI 3.14159265358979323846
+#endif
+
 double rand_gaussian(double mean, double var) {
   // Use the Box-Muller Transformation
   // if x_1 and x_2 are independent uniform [0, 1],
