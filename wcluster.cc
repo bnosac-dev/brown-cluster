@@ -54,26 +54,26 @@ int getpid()
 class semaphore
 {
 private:
-	mutex _m;
-	condition_variable _cv;
-	int _count;
+  mutex _m;
+  condition_variable _cv;
+  int _count;
 
 public:
-	semaphore(int count = 0) : _count(count) {}
+  semaphore(int count = 0) : _count(count) {}
 
-	inline void notify()
-	{
-		unique_lock<mutex> lock(_m);
-		++_count;
-		_cv.notify_one();
-	}
+  inline void notify()
+  {
+    unique_lock<mutex> lock(_m);
+    ++_count;
+    _cv.notify_one();
+  }
 
-	inline void wait()
-	{
-		unique_lock<mutex> lock(_m);
-		_cv.wait(lock, [this]() { return _count > 0; });
-		--_count;
-	}
+  inline void wait()
+  {
+    unique_lock<mutex> lock(_m);
+    _cv.wait(lock, [this]() { return _count > 0; });
+    --_count;
+  }
 };
 
 vector< OptInfo<bool> > bool_opts;
@@ -736,38 +736,37 @@ void update_L2(int thread_id) {
     if (the_job.is_type_a) {
       int s = the_job.s;
 
-      for (int t = thread_id; t < num_clusters; t += num_threads) { // L2[s, *], L2[*, s]
+      for(int t=thread_id; t < num_clusters; t += num_threads) { // L2[s, *], L2[*, s]
         if (slot2cluster[t] == -1) continue;
         if (s == t) continue;
         int S, T;
-        if (ORDER_VALID(s, t)) S = s, T = t;
+        if(ORDER_VALID(s, t)) S = s, T = t;
         else                  S = t, T = s;
         L2[S][T] = compute_L2(S, T);
       }
 
-      for (int t = thread_id; t < num_clusters; t += num_threads) {
+      for(int t=thread_id; t < num_clusters; t += num_threads) {
         if (slot2cluster[t] == -1) continue;
         if (t == s) continue;
         FOR_SLOT(u) {
-          if (u == s) continue;
-          if (!ORDER_VALID(t, u)) continue;
+          if(u == s) continue;
+          if(!ORDER_VALID(t, u)) continue;
           L2[t][u] += bi_q2(t, s) + bi_q2(u, s) - bi_hyp_q2(_(t, u), s);
         }
       }
 
-    }
-    else {       // this is a type B job
+    } else {       // this is a type B job
       int s = the_job.s;
       int t = the_job.t;
       int u = the_job.u;
 
       for (int v = thread_id; v < num_clusters; v += num_threads) {
-        if (slot2cluster[v] == -1) continue;
-        for (int w = 0; w < num_clusters; w++) {
-          if (slot2cluster[w] == -1) continue;
-          if (!ORDER_VALID(v, w)) continue;
+        if ( slot2cluster[v] == -1) continue;
+        for ( int w = 0; w < num_clusters; w++) {
+          if ( slot2cluster[w] == -1) continue;
+          if(!ORDER_VALID(v, w)) continue;
 
-          if (v == u || w == u)
+          if(v == u || w == u)
             L2[v][w] = compute_L2(v, w);
           else
             L2[v][w] = compute_L2_using_old(s, t, u, v, w);
